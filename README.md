@@ -18,7 +18,8 @@ npm run dev                  # http://localhost:3000
 |---|---|---|
 | `GEMINI_API_KEY` | — | Ключ Gemini API (подойдёт и `GOOGLE_API_KEY`) |
 | `GEMINI_MODEL` | `gemini-3.6-flash` | Модель. `gemini-3.5-flash` Google объявил устаревшей и перенаправляет на 3.6 |
-| `AI_TIMEOUT_MS` | `10000` | Таймаут запроса к модели (SPEC 4.1) |
+| `GEMINI_FALLBACK_MODELS` | `gemini-3.5-flash-lite,gemini-3.1-flash-lite` | Запасные модели, если основная перегружена (503) или не успевает |
+| `AI_TIMEOUT_MS` | `25000` | Общий бюджет времени на запрос (в SPEC 10 с, но Gemini под нагрузкой часто не успевает) |
 
 ## API (SPEC 4)
 

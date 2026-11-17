@@ -9,8 +9,18 @@ import type { ToneOfVoice } from "../types";
  * so the replacement is the default. Override with GEMINI_MODEL.
  */
 export const MODEL = process.env.GEMINI_MODEL || "gemini-3.6-flash";
-/** Spec 4.1: 10 s timeout. Configurable in case a larger model needs longer for a full resume. */
-const TIMEOUT_MS = Number(process.env.AI_TIMEOUT_MS) || 10_000;
+/** Tried in order when the previous model is overloaded (503/429) or too slow, within the same time budget. Empty string disables them. */
+export const FALLBACK_MODELS = (process.env.GEMINI_FALLBACK_MODELS ?? "gemini-3.5-flash-lite,gemini-3.1-flash-lite")
+  .split(",")
+  .map((m) => m.trim())
+  .filter(Boolean);
+/**
+ * Total time budget per request. SPEC 4.1 asks for 10 s, but Gemini Flash under load often needs more,
+ * so the default is 25 s: each model except the last gets up to half of what is left, the last one the rest.
+ * The UI offers «Продолжить без обработки» after 12 s anyway.
+ */
+const TIMEOUT_MS = Number(process.env.AI_TIMEOUT_MS) || 25_000;
+const MODEL_SHARE = 0.5;
 
 export const TONE_TEXT: Record<ToneOfVoice, string> = {
   corporate: "corporate — строгий деловой",
@@ -36,7 +46,9 @@ export function systemPrompt(tone: ToneOfVoice, targetTitle: string) {
 - Если заметки к месту работы пустые, напиши 2-3 сдержанных буллита по типичным задачам этой должности, без цифр.
 - Если опыта работы нет (студент или свитчер), сделай упор на образование, курсы, учебные проекты и навыки.
 - Навыки возвращай в исходном написании, каждый ровно в одной категории.
-- Не упоминай пол, возраст и личные данные в текстах.`;
+- Не упоминай пол, возраст и личные данные в текстах.
+- Грамматический род глаголов бери из заметок кандидата (например, «запустила» → «Запустила») и держи его одинаковым во всех текстах: в summary, сильных сторонах и буллитах. Если род по заметкам не понятен, используй мужской род.
+- Буллиты пиши без точки в конце.`;
 }
 
 export class AiError extends Error {
@@ -50,7 +62,10 @@ export class AiError extends Error {
 
 /** JSON Schema for Gemini's responseJsonSchema (the "$schema" key is dropped). */
 function jsonSchema(schema: z.ZodType) {
-  const { $schema: _drop, ...rest } = z.toJSONSchema(schema) as Record<string, unknown>;
+  const { $schema: _drop, ...rest } = z.toJSONSchema(schema) as Record<
+    string,
+    unknown
+  >;
   void _drop;
   return rest;
 }
@@ -58,41 +73,51 @@ function jsonSchema(schema: z.ZodType) {
 let client: GoogleGenAI | null = null;
 
 /** One structured-output call; returns the validated object or throws AiError with a user-facing message. */
-export async function structuredCall<T extends z.ZodType>(schema: T, system: string, user: string, maxTokens = 8000): Promise<z.infer<T>> {
+export async function structuredCall<T extends z.ZodType>(
+  schema: T,
+  system: string,
+  user: string,
+  maxTokens = 8000,
+): Promise<z.infer<T>> {
   const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
   if (!apiKey) throw new AiError("На сервере не задан GEMINI_API_KEY", 503);
-  client ??= new GoogleGenAI({ apiKey });
+  // Our own timeout and fallback replace the SDK's default 5 retries with backoff.
+  client ??= new GoogleGenAI({
+    apiKey,
+    httpOptions: { retryOptions: { attempts: 1 } },
+  });
 
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
+  const started = Date.now();
+  const models = [MODEL, ...FALLBACK_MODELS].filter((m, i, a) => a.indexOf(m) === i);
   try {
-    const res = await client.models.generateContent({
-      model: MODEL,
-      contents: user,
-      config: {
-        systemInstruction: system,
-        maxOutputTokens: maxTokens,
-        // Gemini 3.x docs: keep sampling parameters at their defaults; low thinking keeps the 10 s budget.
-        thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
-        responseMimeType: "application/json",
-        responseJsonSchema: jsonSchema(schema),
-        abortSignal: ctrl.signal,
-      },
-    });
-    if (res.promptFeedback?.blockReason) throw new AiError("Сервис отказался обрабатывать эти данные", 422);
-    const text = res.text;
-    if (!text) throw new AiError("Сервис вернул пустой ответ", 502);
-    const parsed = schema.safeParse(JSON.parse(text));
-    if (!parsed.success) throw new AiError("Не удалось разобрать ответ сервиса", 502);
-    return parsed.data;
+    for (let i = 0; ; i++) {
+      try {
+        // Every model but the last gets part of the remaining budget; the last one gets what is left.
+        const last = i === models.length - 1;
+        const signal = last ? ctrl.signal : AbortSignal.any([ctrl.signal, AbortSignal.timeout(Math.max(1000, (TIMEOUT_MS - (Date.now() - started)) * MODEL_SHARE))]);
+        return await callModel(models[i], schema, system, user, maxTokens, signal);
+      } catch (e) {
+        const slow = !ctrl.signal.aborted && (e as Error)?.name !== "SyntaxError" && !(e instanceof ApiError) && !(e instanceof AiError);
+        const busy = slow || (e instanceof ApiError && (e.status === 503 || e.status === 429 || e.status === 500));
+        if (!busy || i === models.length - 1 || ctrl.signal.aborted) throw e;
+        console.warn(`Gemini ${models[i]} ${e instanceof ApiError ? `returned ${e.status}` : "was too slow"}, trying ${models[i + 1]}`);
+      }
+    }
   } catch (e) {
     if (e instanceof AiError) throw e;
-    if (ctrl.signal.aborted) throw new AiError("Сервис не ответил за отведённое время", 504);
-    if (e instanceof SyntaxError) throw new AiError("Не удалось разобрать ответ сервиса", 502);
+    if (ctrl.signal.aborted)
+      throw new AiError("Сервис не ответил за отведённое время", 504);
+    if (e instanceof SyntaxError)
+      throw new AiError("Не удалось разобрать ответ сервиса", 502);
     if (e instanceof ApiError) {
-      if (e.status === 429) throw new AiError("Сервис перегружен, попробуйте через минуту", 429);
-      if (e.status === 400 && /api key/i.test(e.message)) throw new AiError("Неверный ключ GEMINI_API_KEY", 500);
-      if (e.status === 401 || e.status === 403) throw new AiError("Неверный ключ GEMINI_API_KEY", 500);
+      if (e.status === 429 || e.status === 503)
+        throw new AiError("Сервис перегружен, попробуйте через минуту", 503);
+      if (e.status === 400 && /api key/i.test(e.message))
+        throw new AiError("Неверный ключ GEMINI_API_KEY", 500);
+      if (e.status === 401 || e.status === 403)
+        throw new AiError("Неверный ключ GEMINI_API_KEY", 500);
       throw new AiError(`Ошибка сервиса обработки текста (${e.status})`, 502);
     }
     console.error(e);
@@ -102,10 +127,51 @@ export async function structuredCall<T extends z.ZodType>(schema: T, system: str
   }
 }
 
+async function callModel<T extends z.ZodType>(
+  model: string,
+  schema: T,
+  system: string,
+  user: string,
+  maxTokens: number,
+  signal: AbortSignal,
+): Promise<z.infer<T>> {
+  {
+    const res = await client!.models.generateContent({
+      model,
+      contents: user,
+      config: {
+        systemInstruction: system,
+        maxOutputTokens: maxTokens,
+        // Gemini 3.x docs: keep sampling parameters at their defaults; low thinking keeps the 10 s budget.
+        thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
+        responseMimeType: "application/json",
+        responseJsonSchema: jsonSchema(schema),
+        abortSignal: signal,
+      },
+    });
+    if (res.promptFeedback?.blockReason)
+      throw new AiError("Сервис отказался обрабатывать эти данные", 422);
+    const text = res.text;
+    if (!text) throw new AiError("Сервис вернул пустой ответ", 502);
+    const parsed = schema.safeParse(JSON.parse(text));
+    if (!parsed.success)
+      throw new AiError("Не удалось разобрать ответ сервиса", 502);
+    return parsed.data;
+  }
+}
+
 /* In-memory sliding-window rate limiter (per server instance). Spec 4.1: 5 requests/minute per IP. */
 const hits = new Map<string, number[]>();
-export function rateLimit(request: Request, bucket: string, limit: number, windowMs = 60_000) {
-  const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || request.headers.get("x-real-ip") || "local";
+export function rateLimit(
+  request: Request,
+  bucket: string,
+  limit: number,
+  windowMs = 60_000,
+) {
+  const ip =
+    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    request.headers.get("x-real-ip") ||
+    "local";
   const key = `${bucket}:${ip}`;
   const now = Date.now();
   const list = (hits.get(key) ?? []).filter((t) => now - t < windowMs);
@@ -120,6 +186,7 @@ export function rateLimit(request: Request, bucket: string, limit: number, windo
 }
 
 export function errorResponse(e: unknown) {
-  const err = e instanceof AiError ? e : new AiError("Внутренняя ошибка сервера", 500);
+  const err =
+    e instanceof AiError ? e : new AiError("Внутренняя ошибка сервера", 500);
   return Response.json({ error: err.message }, { status: err.status });
 }
