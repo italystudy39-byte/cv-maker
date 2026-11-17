@@ -1,4 +1,4 @@
-import type { PaletteId } from "./types";
+import type { ThemePaletteId } from "./types";
 
 // WCAG 2.x relative luminance / contrast helpers
 function hexToRgb(hex: string): [number, number, number] {
@@ -33,52 +33,68 @@ export function ensureContrast(fg: string, bg: string, ratio = 4.5) {
 }
 /** Pick white or near-black text for a coloured background. */
 export function textOn(bg: string) {
-  return contrast("#ffffff", bg) >= 4.5 ? "#ffffff" : "#111827";
+  return contrast("#ffffff", bg) >= 4.5 ? "#ffffff" : "#14171B";
 }
 
 export interface Palette {
-  id: PaletteId;
+  id: ThemePaletteId;
   name: string;
+  /** Muted base colour (DESIGN 9.3); every other token is derived from it. */
   base: string;
 }
 
+// DESIGN 9.3: muted bases instead of the Tailwind-like SPEC values. New palettes must stay muted (OKLCH chroma <= 0.12).
 export const PALETTES: Palette[] = [
-  { id: "navy", name: "Deep Navy", base: "#1f3a68" },
-  { id: "emerald", name: "Emerald Green", base: "#0f7b5f" },
-  { id: "graphite", name: "Graphite Dark", base: "#2f3337" },
-  { id: "burgundy", name: "Burgundy", base: "#7a1f3d" },
-  { id: "slate", name: "Slate Blue", base: "#5a7192" },
+  { id: "deep_navy", name: "Тёмно-синий", base: "#1F3A68" },
+  { id: "emerald_green", name: "Изумрудный", base: "#0F7B5F" },
+  { id: "graphite_dark", name: "Графит", base: "#2F3337" },
+  { id: "burgundy_wine", name: "Бордовый", base: "#7A1F3D" },
+  { id: "slate_blue", name: "Серо-голубой", base: "#5A7192" },
 ];
 
 export interface Theme {
-  accent: string; // headings, lines, icons on white (>= 4.5:1 on white)
-  sidebar: string; // sidebar background
-  onSidebar: string; // text on sidebar (auto WCAG)
-  onSidebarMuted: string;
-  chipBg: string; // light tint for skill chips on white
-  chipText: string; // >= 4.5:1 on chipBg
-  tint: string; // very light background for blocks
+  primary: string; // accent: headings, lines, icons (>= 4.5:1 on white)
+  secondary: string; // tint: soft background for strengths and mobile buttons
+  onPrimary: string; // text on primary
+  onSecondary: string; // accent text on tint (>= 4.5:1)
   text: string;
   muted: string;
-  rule: string;
+  rule: string; // subtle divider
+  sidebar: string; // Modern sidebar background
+  onSidebar: string;
+  onSidebarMuted: string;
+  chipBg: string; // Modern skill chips on the sidebar
+  chipText: string;
 }
 
-export function themeFor(id: PaletteId): Theme {
+/** Theme tokens with an automatic WCAG AA guard, so any palette edit stays readable. */
+export function themeFor(id: ThemePaletteId): Theme {
   const p = PALETTES.find((x) => x.id === id) ?? PALETTES[0];
-  const accent = ensureContrast(p.base, "#ffffff", 4.5);
+  const primary = ensureContrast(p.base, "#ffffff", 4.5);
+  const secondary = mix(p.base, "#ffffff", 0.92);
   const sidebar = p.base;
   const onSidebar = textOn(sidebar);
-  const chipBg = mix(p.base, "#ffffff", 0.86);
+  // Chips a step lighter than the sidebar; if that loses contrast with the sidebar text, a step darker.
+  const lighter = mix(sidebar, "#ffffff", 0.16);
+  const chipBg = contrast(onSidebar, lighter) >= 4.5 ? lighter : mix(sidebar, "#000000", 0.2);
   return {
-    accent,
+    primary,
+    secondary,
+    onPrimary: textOn(primary),
+    onSecondary: ensureContrast(primary, secondary, 4.5),
+    text: ensureContrast("#1A1D21", secondary, 7),
+    muted: ensureContrast("#555C66", secondary, 4.5),
+    rule: mix(primary, "#ffffff", 0.75),
     sidebar,
     onSidebar,
-    onSidebarMuted: onSidebar === "#ffffff" ? mix(sidebar, "#ffffff", 0.78) : "#374151",
+    onSidebarMuted: contrast(mix(onSidebar, sidebar, 0.22), sidebar) >= 4.5 ? mix(onSidebar, sidebar, 0.22) : onSidebar,
     chipBg,
-    chipText: ensureContrast(p.base, chipBg, 4.5),
-    tint: mix(p.base, "#ffffff", 0.93),
-    text: "#1f2328",
-    muted: "#5b6470",
-    rule: mix(p.base, "#ffffff", 0.7),
+    chipText: contrast(onSidebar, chipBg) >= 4.5 ? onSidebar : textOn(chipBg),
   };
+}
+
+/** CSS custom properties for the preview container (`.resume-canvas`). */
+export function cssVars(id: ThemePaletteId): Record<string, string> {
+  const t = themeFor(id);
+  return { "--color-primary": t.primary, "--color-secondary": t.secondary, "--color-text-main": t.text, "--color-text-muted": t.muted };
 }

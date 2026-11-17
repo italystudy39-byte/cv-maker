@@ -1,7 +1,6 @@
 // Note: react-pdf treats a present-but-undefined `wrap` prop as wrap=false, so props are only passed when set.
-/* eslint-disable jsx-a11y/alt-text */
 import { Image, Link, Page, Path, Svg, Text, View } from "@react-pdf/renderer";
-import type { Prims } from "./prims";
+import { ICON_STROKE, type Prims } from "./base";
 import type { Variant } from "./ResumeDoc";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -17,10 +16,13 @@ const pdfPrims: Prims = {
       {children}
     </Link>
   ),
+  // eslint-disable-next-line jsx-a11y/alt-text -- react-pdf Image has no alt
   Image: ({ src, style }) => <Image src={src} style={style as any} />,
   Icon: ({ d, size, color }) => (
     <Svg width={size} height={size} viewBox="0 0 24 24">
-      <Path d={d} fill={color} />
+      {d.map((x, i) => (
+        <Path key={i} d={x} fill="none" stroke={color} strokeWidth={ICON_STROKE} strokeLinecap="round" strokeLinejoin="round" />
+      ))}
     </Svg>
   ),
   Page: ({ size, style, children }) => (

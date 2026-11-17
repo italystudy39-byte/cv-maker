@@ -1,28 +1,325 @@
 @import "tailwindcss";
 
-/* Same TTF files the PDF renderer embeds, so preview and PDF match. */
-@font-face { font-family: "Roboto"; src: url("/fonts/Roboto_400Regular.ttf") format("truetype"); font-weight: 400; font-style: normal; font-display: swap; }
-@font-face { font-family: "Roboto"; src: url("/fonts/Roboto_400Regular_Italic.ttf") format("truetype"); font-weight: 400; font-style: italic; font-display: swap; }
+/* ------------------------------------------------------------------------ */
+/* Resume document fonts: the same TTF files the PDF renderer embeds (src/lib/fonts.ts). */
+@font-face { font-family: "Roboto"; src: url("/fonts/Roboto_400Regular.ttf") format("truetype"); font-weight: 400; font-display: swap; }
 @font-face { font-family: "Roboto"; src: url("/fonts/Roboto_500Medium.ttf") format("truetype"); font-weight: 500; font-display: swap; }
 @font-face { font-family: "Roboto"; src: url("/fonts/Roboto_700Bold.ttf") format("truetype"); font-weight: 700; font-display: swap; }
-@font-face { font-family: "PTSerif"; src: url("/fonts/PTSerif_400Regular.ttf") format("truetype"); font-weight: 400; font-style: normal; font-display: swap; }
-@font-face { font-family: "PTSerif"; src: url("/fonts/PTSerif_400Regular_Italic.ttf") format("truetype"); font-weight: 400; font-style: italic; font-display: swap; }
-@font-face { font-family: "PTSerif"; src: url("/fonts/PTSerif_700Bold.ttf") format("truetype"); font-weight: 700; font-display: swap; }
+@font-face { font-family: "PT Serif"; src: url("/fonts/PTSerif_400Regular.ttf") format("truetype"); font-weight: 400; font-display: swap; }
+@font-face { font-family: "PT Serif"; src: url("/fonts/PTSerif_700Bold.ttf") format("truetype"); font-weight: 700; font-display: swap; }
 @font-face { font-family: "Montserrat"; src: url("/fonts/Montserrat_400Regular.ttf") format("truetype"); font-weight: 400; font-display: swap; }
 @font-face { font-family: "Montserrat"; src: url("/fonts/Montserrat_600SemiBold.ttf") format("truetype"); font-weight: 600; font-display: swap; }
 @font-face { font-family: "Montserrat"; src: url("/fonts/Montserrat_800ExtraBold.ttf") format("truetype"); font-weight: 800; font-display: swap; }
 
+/* ------------------------------------------------------------------------ */
+/* DESIGN 3: interface tokens. Light theme. */
+:root {
+  --ui-bg: #e9ecef;
+  --ui-surface: #f6f7f9;
+  --ui-surface-raised: #ffffff;
+  --ui-sunken: #dde1e6;
+  --ui-border: #cdd2d9;
+  --ui-border-strong: #9aa3ae;
+  --ui-text: #14171b;
+  --ui-text-muted: #545d68;
+  --ui-text-faint: #7a838e;
+  --ui-ink: #14171b;
+  --ui-on-ink: #f6f7f9;
+  --ui-accent: #2a4fb5;
+  --ui-accent-soft: #e3e9f7;
+  --ui-danger: #b42318;
+  --ui-danger-soft: #fbe9e7;
+  --ui-warning: #8a5a00;
+  --ui-warning-soft: #fbf1dc;
+  --ui-success: #1d6b45;
+  --ui-pop-border: transparent;
+
+  --radius-s: 4px;
+  --radius-m: 6px;
+  --radius-l: 10px;
+  --radius-full: 999px;
+
+  --dur-instant: 100ms;
+  --dur-fast: 150ms;
+  --dur-base: 200ms;
+  --dur-slow: 250ms;
+  --ease-out: cubic-bezier(0.2, 0, 0, 1);
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --ease-move: cubic-bezier(0.3, 0, 0.1, 1);
+
+  color-scheme: light;
+}
+
+/* DESIGN 3.2: dark theme, graphite. The resume sheet stays white. */
+:root[data-theme="dark"] {
+  --ui-bg: #101317;
+  --ui-surface: #171b20;
+  --ui-surface-raised: #1e2329;
+  --ui-sunken: #0b0d10;
+  --ui-border: #2c333b;
+  --ui-border-strong: #46505b;
+  --ui-text: #e6e9ed;
+  --ui-text-muted: #9ca5b0;
+  --ui-text-faint: #6f7883;
+  --ui-ink: #e6e9ed;
+  --ui-on-ink: #101317;
+  --ui-accent: #8ea8ee;
+  --ui-accent-soft: #1f2a44;
+  --ui-danger: #f2867b;
+  --ui-danger-soft: #3a1c1a;
+  --ui-warning: #e3b45c;
+  --ui-warning-soft: #33280f;
+  --ui-success: #6cc79a;
+  --ui-pop-border: #46505b;
+  color-scheme: dark;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ui-bg: #101317;
+    --ui-surface: #171b20;
+    --ui-surface-raised: #1e2329;
+    --ui-sunken: #0b0d10;
+    --ui-border: #2c333b;
+    --ui-border-strong: #46505b;
+    --ui-text: #e6e9ed;
+    --ui-text-muted: #9ca5b0;
+    --ui-text-faint: #6f7883;
+    --ui-ink: #e6e9ed;
+    --ui-on-ink: #101317;
+    --ui-accent: #8ea8ee;
+    --ui-accent-soft: #1f2a44;
+    --ui-danger: #f2867b;
+    --ui-danger-soft: #3a1c1a;
+    --ui-warning: #e3b45c;
+    --ui-warning-soft: #33280f;
+    --ui-success: #6cc79a;
+    --ui-pop-border: #46505b;
+    color-scheme: dark;
+  }
+}
+
+/* Tailwind gets only the design tokens: the stock palette, radii and shadows are switched off. */
+@theme inline {
+  --color-*: initial;
+  --color-bg: var(--ui-bg);
+  --color-surface: var(--ui-surface);
+  --color-raised: var(--ui-surface-raised);
+  --color-sunken: var(--ui-sunken);
+  --color-line: var(--ui-border);
+  --color-line-strong: var(--ui-border-strong);
+  --color-fg: var(--ui-text);
+  --color-muted: var(--ui-text-muted);
+  --color-faint: var(--ui-text-faint);
+  --color-ink: var(--ui-ink);
+  --color-on-ink: var(--ui-on-ink);
+  --color-accent: var(--ui-accent);
+  --color-accent-soft: var(--ui-accent-soft);
+  --color-danger: var(--ui-danger);
+  --color-danger-soft: var(--ui-danger-soft);
+  --color-warning: var(--ui-warning);
+  --color-warning-soft: var(--ui-warning-soft);
+  --color-success: var(--ui-success);
+  --color-paper: #ffffff;
+
+  --radius-*: initial;
+  --radius-sm: var(--radius-s);
+  --radius-md: var(--radius-m);
+  --radius-lg: var(--radius-l);
+
+  --shadow-*: initial;
+  --shadow-pop: 0 1px 2px rgb(16 19 23 / 0.06), 0 8px 24px rgb(16 19 23 / 0.1);
+  --shadow-modal: 0 2px 4px rgb(16 19 23 / 0.08), 0 24px 48px rgb(16 19 23 / 0.18);
+  --shadow-paper: 0 1px 3px rgb(16 19 23 / 0.08), 0 0 0 1px rgb(16 19 23 / 0.04);
+
+  --font-sans: var(--font-golos), system-ui, sans-serif;
+  --font-serif: var(--font-source-serif), Georgia, serif;
+}
+
+/* ------------------------------------------------------------------------ */
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
 body {
-  font-family: "Roboto", system-ui, -apple-system, "Segoe UI", sans-serif;
+  background: var(--ui-bg);
+  color: var(--ui-text);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 22px;
+}
+:focus-visible {
+  outline: 2px solid var(--ui-accent);
+  outline-offset: 2px;
+}
+::placeholder {
+  color: var(--ui-text-faint);
+  opacity: 1;
+}
+.tnum {
+  font-variant-numeric: tabular-nums;
 }
 
 @layer components {
-  .label { @apply mb-1 block text-sm font-medium text-slate-700; }
-  .hint { @apply text-xs text-slate-500; }
-  .input { @apply w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-[15px] outline-none transition focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10; }
-  .btn-primary { @apply inline-flex items-center justify-center rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50; }
-  .btn-secondary { @apply inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-800 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50; }
-  .btn-ai { @apply inline-flex items-center justify-center rounded-lg bg-gradient-to-r from-violet-600 to-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50; }
-  .chip { @apply rounded-full border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-700 transition hover:border-slate-500; }
-  .chip-on { @apply border-slate-900 bg-slate-900 text-white hover:border-slate-900; }
+  .t-display { font-family: var(--font-serif); font-size: 40px; line-height: 44px; font-weight: 600; letter-spacing: -0.01em; }
+  .t-h1 { font-family: var(--font-serif); font-size: 28px; line-height: 34px; font-weight: 600; }
+  .t-h2 { font-family: var(--font-serif); font-size: 20px; line-height: 26px; font-weight: 600; }
+  .t-label { font-size: 14px; line-height: 20px; font-weight: 500; }
+  .t-small { font-size: 13px; line-height: 18px; }
+  .t-caps { font-size: 12px; line-height: 16px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ui-text-muted); }
+  @media (max-width: 1023px) {
+    .t-display { font-size: 30px; line-height: 36px; }
+    .t-h1 { font-size: 22px; line-height: 28px; }
+    .t-h2 { font-size: 17px; line-height: 24px; }
+  }
+
+  .label { display: flex; align-items: baseline; gap: 8px; margin-bottom: 6px; font-size: 14px; line-height: 20px; font-weight: 500; color: var(--ui-text); }
+  .hint { font-size: 13px; line-height: 18px; color: var(--ui-text-muted); max-width: 64ch; }
+
+  .input {
+    width: 100%;
+    min-height: 40px;
+    padding: 8px 12px;
+    border: 1px solid var(--ui-border);
+    border-radius: var(--radius-m);
+    background: var(--ui-surface-raised);
+    color: var(--ui-text);
+    font-size: 15px;
+    line-height: 22px;
+    transition: border-color var(--dur-instant) linear;
+  }
+  .input:hover { border-color: var(--ui-border-strong); }
+  .input:focus { border-color: var(--ui-accent); outline: none; }
+  .input:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: 2px; }
+  .input[aria-invalid="true"] { border-color: var(--ui-danger); }
+  .input:disabled { opacity: 0.45; cursor: not-allowed; }
+  textarea.input { resize: none; field-sizing: content; min-height: calc(4 * 22px + 18px); }
+  @media (max-width: 1023px) {
+    .input { min-height: 44px; font-size: 16px; }
+  }
+
+  .btn {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    height: 40px;
+    padding: 0 16px;
+    border: 1px solid transparent;
+    border-radius: var(--radius-m);
+    font-size: 14px;
+    line-height: 20px;
+    font-weight: 500;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background-color var(--dur-instant) linear, border-color var(--dur-instant) linear, color var(--dur-instant) linear;
+  }
+  .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+  .btn[aria-busy="true"] { opacity: 1; cursor: progress; }
+  .btn-s { height: 32px; padding: 0 12px; }
+  @media (max-width: 1023px) {
+    .btn { height: 44px; }
+    .btn-s { height: 36px; }
+  }
+  .btn-primary { background: var(--ui-ink); color: var(--ui-on-ink); }
+  .btn-primary:hover:not(:disabled) { background: color-mix(in oklab, var(--ui-ink), white 8%); }
+  :root[data-theme="dark"] .btn-primary:hover:not(:disabled) { background: color-mix(in oklab, var(--ui-ink), black 8%); }
+  .btn-primary:active:not(:disabled) { transform: translateY(1px); }
+  .btn-secondary { background: var(--ui-surface-raised); border-color: var(--ui-border); color: var(--ui-text); }
+  .btn-secondary:hover:not(:disabled) { border-color: var(--ui-border-strong); }
+  .btn-secondary:active:not(:disabled) { background: var(--ui-sunken); }
+  .btn-ghost { background: transparent; color: var(--ui-text-muted); }
+  .btn-ghost:hover:not(:disabled) { background: var(--ui-sunken); color: var(--ui-text); }
+  .btn-danger { background: transparent; color: var(--ui-danger); }
+  .btn-danger:hover:not(:disabled) { background: var(--ui-danger-soft); }
+  .btn-icon { width: 40px; padding: 0; }
+  .btn-icon.btn-s { width: 32px; }
+
+  .spinner {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    border: 1.5px solid currentColor;
+    border-right-color: transparent;
+    animation: spin 0.8s linear infinite;
+    flex-shrink: 0;
+  }
+
+  .pop {
+    background: var(--ui-surface-raised);
+    border: 1px solid var(--ui-pop-border);
+    border-radius: var(--radius-l);
+    box-shadow: var(--shadow-pop);
+  }
+
+  .notice {
+    border-left: 3px solid var(--ui-warning);
+    background: var(--ui-warning-soft);
+    color: var(--ui-text);
+    border-radius: 0 var(--radius-m) var(--radius-m) 0;
+    padding: 12px 16px;
+    font-size: 14px;
+    line-height: 20px;
+  }
+}
+
+/* ------------------------------------------------------------------------ */
+/* DESIGN 7: motion. Only transform and opacity (and colour) move. */
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes step-in-next { from { opacity: 0; transform: translateX(12px); } to { opacity: 1; transform: none; } }
+@keyframes step-in-prev { from { opacity: 0; transform: translateX(-12px); } to { opacity: 1; transform: none; } }
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes rise-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+@keyframes drop-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+@keyframes toast-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes modal-in { from { opacity: 0; transform: scale(0.98); } to { opacity: 1; transform: none; } }
+@keyframes sheet-up { from { transform: translateY(100%); } to { transform: none; } }
+@keyframes check-in { from { opacity: 0; transform: scale(0.6); } to { opacity: 1; transform: none; } }
+@keyframes progress-run { from { transform: translateX(-100%); } to { transform: translateX(333%); } }
+@keyframes flash-block { from { background-color: var(--color-secondary); } to { background-color: transparent; } }
+
+.anim-step-next { animation: step-in-next var(--dur-base) var(--ease-out); }
+.anim-step-prev { animation: step-in-prev var(--dur-base) var(--ease-out); }
+.anim-fade { animation: fade-in var(--dur-base) var(--ease-out); }
+.anim-rise { animation: rise-in var(--dur-fast) var(--ease-out); }
+.anim-drop { animation: drop-in var(--dur-fast) var(--ease-out); }
+.anim-toast { animation: toast-in var(--dur-base) var(--ease-out); }
+.anim-modal { animation: modal-in var(--dur-base) var(--ease-out); }
+.anim-sheet { animation: sheet-up var(--dur-slow) var(--ease-out); }
+.anim-check { animation: check-in var(--dur-fast) var(--ease-out); }
+.anim-phone { animation: modal-in var(--dur-base) var(--ease-out); }
+@media (max-width: 1023px) {
+  .anim-modal { animation: sheet-up var(--dur-slow) var(--ease-out); }
+}
+
+.progress-track { position: relative; height: 2px; overflow: hidden; }
+.progress-run { position: absolute; inset: 0 auto 0 0; width: 30%; background: var(--ui-accent); animation: progress-run 1.4s ease-in-out infinite; }
+
+/* Collapsible job cards: height through grid rows, never through height itself. */
+.reveal { display: grid; grid-template-rows: 0fr; transition: grid-template-rows var(--dur-base) var(--ease-move); }
+.reveal[data-open="true"] { grid-template-rows: 1fr; }
+.reveal > div { overflow: hidden; min-height: 0; }
+.reveal > div > * { opacity: 0; transition: opacity var(--dur-fast) linear; }
+.reveal[data-open="true"] > div > * { opacity: 1; transition-delay: 60ms; }
+.reveal[data-open="true"] > div { overflow: visible; }
+
+/* Segmented control thumb (DESIGN 6.6): the only sliding animation. */
+.seg-thumb { transition: transform 180ms var(--ease-move), width 0ms; }
+
+/* ------------------------------------------------------------------------ */
+/* The resume sheet in the preview. */
+.resume-sheet * { transition: color var(--dur-base) linear, background-color var(--dur-base) linear, border-color var(--dur-base) linear; }
+.resume-editable { cursor: text; border-radius: 2px; outline: 1px dashed transparent; outline-offset: 2px; }
+.resume-editable:hover { outline-color: var(--ui-accent); }
+.resume-editable:focus { outline: 1px solid var(--ui-accent); }
+/* DESIGN 7.4: changed blocks get the palette tint, fading over 1.2 s after 600 ms. */
+.resume-flash .resume-editable { animation: flash-block 1.2s linear 600ms both; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 100ms !important; animation-delay: 0ms !important; transition-duration: 100ms !important; }
+  .anim-step-next, .anim-step-prev, .anim-rise, .anim-drop, .anim-toast, .anim-modal, .anim-sheet, .anim-check, .anim-phone { animation-name: fade-in; }
+  .progress-run { display: none; }
+  .spinner { animation: none; border-right-color: currentColor; opacity: 0.6; }
+  .resume-flash .resume-editable { animation: none; background-color: var(--color-secondary); }
+  .seg-thumb { transition: none; }
 }

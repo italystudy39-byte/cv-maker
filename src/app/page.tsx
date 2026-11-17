@@ -1,53 +1,102 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Builder } from "@/components/Builder";
-import { useDraft } from "@/lib/useDraft";
+import { htmlPrims } from "@/components/templates/prims";
+import { A4, MOBILE_WIDTH, ResumeDoc } from "@/components/templates/ResumeDoc";
+import { fmtDateTime, Logo, ThemeToggle, ToastProvider } from "@/components/ui";
+import { SAMPLE } from "@/lib/sample";
+import { hydrateResume, useResume } from "@/lib/store";
 
 export default function Home() {
-  const d = useDraft();
+  const [ready, setReady] = useState(false);
+  const [hasDraft, setHasDraft] = useState(false);
   const [started, setStarted] = useState(false);
+  const reset = useResume((s) => s.reset);
+  const updatedAt = useResume((s) => s.doc.meta.updatedAt);
 
-  if (!d.hydrated) return <main className="min-h-screen" />;
-  if (started) return <main className="min-h-screen">{<Builder d={d} />}</main>;
+  useEffect(() => {
+    hydrateResume().then((had) => {
+      setHasDraft(had);
+      setReady(true);
+    });
+  }, []);
 
+  if (!ready) return <main className="min-h-dvh" />;
+  if (started)
+    return (
+      <ToastProvider>
+        <Builder
+          onHome={() => {
+            setHasDraft(true);
+            setStarted(false);
+          }}
+        />
+      </ToastProvider>
+    );
+
+  // DESIGN 4.1: one 640 px column, no hero, a real example instead of an illustration.
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center px-4 py-16">
-      <div className="max-w-2xl text-center">
-        <p className="mb-3 text-sm font-medium uppercase tracking-widest text-slate-500">ИИ-конструктор резюме</p>
-        <h1 className="text-4xl font-bold leading-tight text-slate-900 sm:text-5xl">Сильное резюме за 10 минут</h1>
-        <p className="mx-auto mt-5 max-w-xl text-lg text-slate-600">
-          Впишите факты о себе как есть. ИИ сформулирует опыт языком достижений, выделит сильные стороны и соберёт два PDF: для печати и для отправки в мессенджер.
-        </p>
-        <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
-          <button type="button" className="btn-primary px-8 py-3 text-base" onClick={() => setStarted(true)}>
-            {d.hasSaved ? "Продолжить черновик" : "Создать резюме"}
-          </button>
-          {d.hasSaved ? (
-            <button
-              type="button"
-              className="btn-secondary px-6 py-3 text-base"
-              onClick={() => {
-                d.reset();
-                setStarted(true);
-              }}
-            >
-              Начать с нуля
-            </button>
-          ) : null}
-        </div>
-        <ul className="mx-auto mt-12 grid max-w-xl gap-4 text-left text-sm text-slate-600 sm:grid-cols-3">
-          <li className="rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200/70">
-            <b className="block text-slate-900">ИИ-редактор</b>«О себе», буллиты с глаголами действия, сильные стороны
-          </li>
-          <li className="rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200/70">
-            <b className="block text-slate-900">3 шаблона, 5 палитр</b>Переключение в один клик, данные не теряются
-          </li>
-          <li className="rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200/70">
-            <b className="block text-slate-900">A4 + Mobile PDF</b>Текстовый слой для ATS и кликабельные контакты
-          </li>
-        </ul>
-        <p className="mt-8 text-xs text-slate-400">Черновик хранится только в вашем браузере. Регистрация не нужна.</p>
+    <main className="min-h-dvh">
+      <div className="mx-auto flex max-w-[640px] items-center justify-between px-4 pt-5 lg:px-0">
+        <Logo />
+        <ThemeToggle />
       </div>
+      <div className="mx-auto max-w-[640px] px-4 pt-14 lg:px-0 lg:pt-20">
+        <h1 className="t-display max-w-[20ch] text-fg">Резюме, которое удобно читать и на бумаге, и в телефоне</h1>
+        <p className="mt-5 max-w-[56ch] text-[17px] leading-[26px] text-muted">
+          Заполните шесть коротких шагов своими словами. Мы перепишем опыт в деловые пункты, выделим сильные стороны и соберём два PDF: A4 для печати и сайтов и длинную страницу для Telegram и WhatsApp.
+        </p>
+        <div className="mt-8 flex flex-wrap items-center gap-3">
+          {hasDraft ? (
+            <>
+              <button type="button" className="btn btn-primary" onClick={() => setStarted(true)}>
+                Продолжить черновик
+              </button>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => {
+                  reset();
+                  setStarted(true);
+                }}
+              >
+                Создать резюме
+              </button>
+            </>
+          ) : (
+            <button type="button" className="btn btn-primary" onClick={() => setStarted(true)}>
+              Создать резюме
+            </button>
+          )}
+        </div>
+        {hasDraft && updatedAt ? <p className="t-small tnum mt-3 text-muted">Черновик изменён {fmtDateTime(updatedAt)}</p> : null}
+      </div>
+
+      <Example />
+
+      <p className="t-small mx-auto max-w-[640px] px-4 pt-8 pb-16 text-muted lg:px-0">Без регистрации · Черновик хранится в вашем браузере · PDF с текстовым слоем для ATS</p>
     </main>
+  );
+}
+
+/** Two real sheets, A4 and phone, overlapping on the grey surface. Rendered by the same templates as the PDF. */
+function Example() {
+  const a4 = 0.5;
+  const mob = 0.5;
+  return (
+    <div className="mx-auto mt-14 max-w-[640px] px-4 lg:px-0" aria-label="Пример резюме: версия A4 и версия для телефона" role="img">
+      <div className="relative h-[330px] overflow-hidden rounded-lg bg-sunken sm:h-[400px]" aria-hidden>
+        <div className="absolute top-8 left-6 origin-top-left shadow-paper sm:left-10" style={{ width: A4.width, transform: `scale(${a4})` }}>
+          <div className="pointer-events-none select-none">
+            <ResumeDoc doc={SAMPLE} P={htmlPrims} variant="a4" />
+          </div>
+        </div>
+        <div className="absolute top-16 right-6 origin-top-right overflow-hidden rounded-[20px] border border-line-strong bg-paper p-2 shadow-paper sm:right-auto sm:left-[290px] sm:origin-top-left" style={{ width: MOBILE_WIDTH + 18, transform: `scale(${mob})` }}>
+          <div className="pointer-events-none overflow-hidden rounded-[12px] select-none">
+            <ResumeDoc doc={{ ...SAMPLE, meta: { ...SAMPLE.meta, template: "modern" } }} P={htmlPrims} variant="mobile" />
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }

@@ -1,125 +1,103 @@
-export type SkillKind = "hard" | "soft" | null;
+// Data model from the technical specification, section 2 (ResumeDocument).
 
-export interface Skill {
-  name: string;
-  kind: SkillKind;
-}
+export type ToneOfVoice = "corporate" | "modern" | "creative";
+export type TemplateId = "classic" | "modern" | "minimal";
+export type ThemePaletteId = "deep_navy" | "emerald_green" | "graphite_dark" | "burgundy_wine" | "slate_blue";
 
-export interface Job {
+export interface Experience {
   id: string;
   company: string;
   position: string;
-  start: string; // YYYY-MM
-  end: string; // YYYY-MM
-  current: boolean;
-  notes: string; // raw notes from the user
-  bullets: string[]; // AI-rewritten (editable) bullets
+  startDate: string; // YYYY-MM
+  endDate?: string; // YYYY-MM
+  isCurrent: boolean;
+  rawNotes: string;
+  aiBullets: string[];
 }
 
-export interface Education {
+export interface EducationItem {
   id: string;
   institution: string;
-  faculty: string;
+  specialty: string;
   degree: string;
-  year: string;
+  graduationYear: number | null;
+  isCourse: boolean;
 }
 
-export interface Course {
-  id: string;
-  name: string;
-  issuer: string;
-  year: string;
-}
-
-export interface Strength {
+export interface KeyStrength {
   title: string;
   description: string;
 }
 
-export interface Contacts {
-  phone: string;
-  email: string;
-  telegram: string;
-  linkedin: string;
-  portfolio: string;
-  city: string;
+export interface ResumeDocument {
+  meta: {
+    id: string;
+    updatedAt: string;
+    template: TemplateId;
+    theme: ThemePaletteId;
+    tone: ToneOfVoice;
+    /** Extension: "fit to one page" mode (spec 8.1), 9.5pt base font and 20% tighter spacing. */
+    compact?: boolean;
+  };
+  personal: {
+    photoUrl?: string;
+    /** Extension: crop ratio chosen in the cropper, so templates size the photo correctly. */
+    photoRatio?: "1:1" | "3:4";
+    fullName: string;
+    targetTitle: string;
+    birthDate?: string;
+    showAge: boolean;
+    location?: string;
+  };
+  contacts: {
+    phone?: string;
+    email?: string;
+    telegram?: string;
+    linkedin?: string;
+    portfolioUrl?: string;
+  };
+  aiGenerated: {
+    summary: string;
+    keyStrengths: KeyStrength[];
+  };
+  experience: Experience[];
+  education: EducationItem[];
+  skills: {
+    hard: string[];
+    soft: string[];
+  };
 }
 
-export type Tone = "corporate" | "modern" | "creative";
-export type TemplateId = "classic" | "modern" | "minimal";
-export type PaletteId = "navy" | "emerald" | "graphite" | "burgundy" | "slate";
+export const uid = () =>
+  typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : Math.random().toString(36).slice(2);
 
-export interface Resume {
-  photo: string | null; // cropped data URL
-  photoRatio: "1:1" | "3:4";
-  fullName: string;
-  title: string;
-  birthDate: string; // YYYY-MM-DD
-  showAge: boolean;
-  contacts: Contacts;
-  jobs: Job[];
-  education: Education[];
-  courses: Course[];
-  skills: Skill[];
-  summary: string;
-  strengths: Strength[];
-}
-
-export interface Settings {
-  template: TemplateId;
-  palette: PaletteId;
-  tone: Tone;
-}
-
-export interface Draft {
-  version: 1;
-  resume: Resume;
-  settings: Settings;
-  step: number;
-}
-
-export const uid = () => Math.random().toString(36).slice(2, 10);
-
-export const emptyJob = (): Job => ({
+export const emptyExperience = (): Experience => ({
   id: uid(),
   company: "",
   position: "",
-  start: "",
-  end: "",
-  current: false,
-  notes: "",
-  bullets: [],
+  startDate: "",
+  endDate: "",
+  isCurrent: false,
+  rawNotes: "",
+  aiBullets: [],
 });
 
-export const emptyEducation = (): Education => ({
+export const emptyEducation = (isCourse = false): EducationItem => ({
   id: uid(),
   institution: "",
-  faculty: "",
+  specialty: "",
   degree: "",
-  year: "",
+  graduationYear: null,
+  isCourse,
 });
 
-export const emptyCourse = (): Course => ({ id: uid(), name: "", issuer: "", year: "" });
-
-export const emptyResume = (): Resume => ({
-  photo: null,
-  photoRatio: "1:1",
-  fullName: "",
-  title: "",
-  birthDate: "",
-  showAge: true,
-  contacts: { phone: "", email: "", telegram: "", linkedin: "", portfolio: "", city: "" },
-  // Fixed ids: this runs during prerender, where random values are not allowed.
-  jobs: [{ id: "job-1", company: "", position: "", start: "", end: "", current: false, notes: "", bullets: [] }],
-  education: [{ id: "edu-1", institution: "", faculty: "", degree: "", year: "" }],
-  courses: [],
-  skills: [],
-  summary: "",
-  strengths: [],
-});
-
-export const defaultSettings = (): Settings => ({
-  template: "modern",
-  palette: "navy",
-  tone: "modern",
+/** Fixed ids/dates: this also runs during prerender, where random values and clocks are not allowed. */
+export const emptyResume = (): ResumeDocument => ({
+  meta: { id: "draft", updatedAt: "", template: "modern", theme: "deep_navy", tone: "modern" },
+  personal: { fullName: "", targetTitle: "", showAge: true, photoRatio: "1:1" },
+  contacts: {},
+  aiGenerated: { summary: "", keyStrengths: [] },
+  experience: [{ id: "exp-1", company: "", position: "", startDate: "", endDate: "", isCurrent: false, rawNotes: "", aiBullets: [] }],
+  education: [{ id: "edu-1", institution: "", specialty: "", degree: "", graduationYear: null, isCourse: false }],
+  skills: { hard: [], soft: [] },
 });
